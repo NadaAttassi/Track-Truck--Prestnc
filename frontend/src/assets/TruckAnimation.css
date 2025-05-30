@@ -1,0 +1,225 @@
+.logo {
+  height: 60px;
+  margin: 0 auto 20px;
+  display: block;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+border-radius: 16px;
+border: 2px solid #e0e0e0;
+}
+
+/* Update login header spacing */
+.login-header {
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+  margin-bottom: 30px;
+}
+
+/* Base & Background */
+.app-container {
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(-45deg, #024083, #01275e, #810707, #024083);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
+}
+
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Doors */
+.left-door, .right-door {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 50%;
+  background: #333;
+  z-index: 15;
+  transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  box-shadow: 0 0 30px rgba(0,0,0,0.5);
+}
+
+.left-door { left: 0; }
+.right-door { right: 0; }
+
+.app-container.doors-closed .left-door,
+.app-container.doors-closed .right-door {
+  transform: translateX(0);
+}
+
+.app-container.doors-open .left-door {
+  transform: translateX(-100%) !important; /* Force stay open */
+}
+.app-container.doors-open .right-door {
+  transform: translateX(100%) !important; /* Force stay open */
+}
+
+/* Truck Animation */
+.truck-animation {
+  position: absolute;
+  top: 45%;
+  width: 100%;
+  z-index: 20;
+}
+
+.truck {
+  font-size: 8rem;
+  position: absolute;
+  right: -150px;
+  color: #ff0000;
+  text-shadow: 0 0 15px rgba(255,0,0,0.7);
+  animation: driveIn 2s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+}
+
+@keyframes driveIn {
+  0% { right: -150px; transform: scale(1.8); }
+  50% { right: 45%; transform: scale(1.8); }
+  100% { right: 100%; transform: scale(1.8); }
+}
+
+.road {
+  position: absolute;
+  bottom: -30px;
+  width: 100%;
+  height: 80px;
+  background: #555;
+  background: repeating-linear-gradient(
+    0deg,
+    #666 0px,
+    #666 10px,
+    #777 10px,
+    #777 20px
+  );
+  transition: opacity 0.3s ease-out;
+}
+
+.app-container.animation-complete .road {
+  opacity: 0;
+}
+
+/* Enhanced Login Container */
+.login-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 25;
+  animation: fadeIn 0.8s ease-out;
+}
+
+.login-card {
+  background: rgba(255,255,255,0.95);
+  border-radius: 12px;
+  padding: 2.5rem;
+  width: 90%;
+  max-width: 420px;
+  box-shadow: 
+    0 10px 25px rgba(0,0,0,0.15),
+    0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.login-header h1 {
+  color: #024083;
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.login-header p {
+  color: #666;
+  font-size: 1rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  color: #024083;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.9rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.form-group input:focus {
+  border-color: #024083;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(2,64,131,0.1);
+}
+
+.form-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 1.5rem 0;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+}
+
+.remember-me input {
+  margin-right: 0.5rem;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 1rem;
+  background: #024083;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.submit-btn:hover {
+  background: #01275e;
+  transform: translateY(-1px);
+}
+
+.password-help {
+  text-align: center;
+  margin-top: 1.5rem;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.password-help a {
+  color: #024083;
+  text-decoration: none;
+}
+
+.password-help a:hover {
+  text-decoration: underline;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
