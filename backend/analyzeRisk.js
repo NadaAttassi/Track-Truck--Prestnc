@@ -106,6 +106,13 @@ function generateIntermediatePoints(point1, point2, count = 10) {
   return points
 }
 
+// Fonction pour déterminer la catégorie de risque basée sur la valeur numérique
+function getRiskCategory(riskNumeric) {
+  if (riskNumeric >= 0.7) return "élevé";
+  if (riskNumeric >= 0.5) return "moyen";
+  return "faible";
+}
+
 // Route pour analyser les points à risque
 router.post("/analyze-risk", async (req, res) => {
   try {
@@ -125,12 +132,14 @@ router.post("/analyze-risk", async (req, res) => {
     // Pré-calculer les centres de gravité
     const zonesWithCentroids = zones.map((zone, zoneIndex) => {
       const centroid = calculateCentroid(zone.geometry)
+      const riskCategory = getRiskCategory(zone.risk_numeric)
       console.log(
-        `📍 Zone ${zone.zoneId || zoneIndex}: ${zone.risk || "inconnu"} - Centroïde: ${centroid ? `${centroid.lat.toFixed(4)}, ${centroid.lon.toFixed(4)}` : "non calculé"}`,
+        `📍 Zone ${zone.zoneId || zoneIndex}: ${zone.risk_numeric.toFixed(4)} (${riskCategory}) - Centroïde: ${centroid ? `${centroid.lat.toFixed(4)}, ${centroid.lon.toFixed(4)}` : "non calculé"}`,
       )
       return {
         ...zone,
         centroid: centroid,
+        riskCategory: riskCategory
       }
     })
 
@@ -145,7 +154,8 @@ router.post("/analyze-risk", async (req, res) => {
         console.warn(`⚠️ Itinéraire ${routeIndex + 1} - Géométrie invalide`)
         return {
           routeIndex: routeIndex,
-          riskCounts: { élevé: 0, moyen: 0, faible: 0 },
+          riskScores: [],
+          averageRiskScore: 0,
           totalPoints: 0,
         }
       }
@@ -153,9 +163,9 @@ router.post("/analyze-risk", async (req, res) => {
       console.log(`\n🛣️ ANALYSE ITINÉRAIRE ${routeIndex + 1}`)
       console.log(`📍 ${geometry.length} points à analyser`)
 
-      const riskCounts = { élevé: 0, moyen: 0, faible: 0 }
       const detectedRisks = []
       const detectedZoneIds = new Set()
+      const riskScores = []
 
       // MÉTHODE 1: Échantillonnage dense pour la détection par point
       const sampleRate = Math.max(1, Math.floor(geometry.length / 500))
@@ -173,22 +183,20 @@ router.post("/analyze-risk", async (req, res) => {
         for (const zone of zonesWithCentroids) {
           if (!zone.geometry || zone.geometry.length < 3) continue
 
-          const zoneRisk = zone.risk?.toLowerCase()
-          if (!zoneRisk || !["élevé", "moyen", "faible"].includes(zoneRisk)) continue
-
           if (isPointInPolygon(pointObj, zone.geometry)) {
             if (!detectedZoneIds.has(zone.zoneId)) {
               detectedZoneIds.add(zone.zoneId)
-              riskCounts[zoneRisk] = (riskCounts[zoneRisk] || 0) + 1
+              riskScores.push(zone.risk_numeric)
               detectedRisks.push({
                 point: pointIndex,
-                risk: zoneRisk,
+                risk_numeric: zone.risk_numeric,
+                riskCategory: zone.riskCategory,
                 method: "DANS_ZONE",
                 zone: zone.zoneId,
                 distance: 0,
                 coordinates: [pointObj.lat, pointObj.lon],
               })
-              console.log(`✅ Point ${pointIndex + 1} DANS zone ${zone.zoneId} - Risque: ${zoneRisk}`)
+              console.log(`✅ Point ${pointIndex + 1} DANS zone ${zone.zoneId} - Risque: ${zone.risk_numeric.toFixed(4)} (${zone.riskCategory})`)
             }
           }
         }
@@ -208,22 +216,20 @@ router.post("/analyze-risk", async (req, res) => {
           for (const zone of zonesWithCentroids) {
             if (!zone.geometry || zone.geometry.length < 3) continue
 
-            const zoneRisk = zone.risk?.toLowerCase()
-            if (!zoneRisk || !["élevé", "moyen", "faible"].includes(zoneRisk)) continue
-
             if (isPointInPolygon(point, zone.geometry)) {
               if (!detectedZoneIds.has(zone.zoneId)) {
                 detectedZoneIds.add(zone.zoneId)
-                riskCounts[zoneRisk] = (riskCounts[zoneRisk] || 0) + 1
+                riskScores.push(zone.risk_numeric)
                 detectedRisks.push({
                   segment: i,
-                  risk: zoneRisk,
+                  risk_numeric: zone.risk_numeric,
+                  riskCategory: zone.riskCategory,
                   method: "SEGMENT_INTERSECTION",
                   zone: zone.zoneId,
                   distance: 0,
                   coordinates: [point.lat, point.lon],
                 })
-                console.log(`🔄 Segment ${i} INTERSECTE zone ${zone.zoneId} - Risque: ${zoneRisk}`)
+                console.log(`🔄 Segment ${i} INTERSECTE zone ${zone.zoneId} - Risque: ${zone.risk_numeric.toFixed(4)} (${zone.riskCategory})`)
               }
             }
           }
@@ -238,37 +244,48 @@ router.post("/analyze-risk", async (req, res) => {
         for (const zone of zonesWithCentroids) {
           if (!zone.centroid) continue
 
-          const zoneRisk = zone.risk?.toLowerCase()
-          if (!zoneRisk || !["élevé", "moyen", "faible"].includes(zoneRisk)) continue
-
           const distance = haversineDistance(pointObj.lat, pointObj.lon, zone.centroid.lat, zone.centroid.lon)
 
           if (distance <= proximityThreshold && !detectedZoneIds.has(zone.zoneId)) {
             detectedZoneIds.add(zone.zoneId)
-            riskCounts[zoneRisk] = (riskCounts[zoneRisk] || 0) + 1
+            riskScores.push(zone.risk_numeric)
             detectedRisks.push({
-              risk: zoneRisk,
+              risk_numeric: zone.risk_numeric,
+              riskCategory: zone.riskCategory,
               method: "PROXIMITE_CENTROIDE",
               zone: zone.zoneId,
               distance: distance,
               coordinates: [pointObj.lat, pointObj.lon],
             })
-            console.log(`🔶 PROCHE centroïde zone ${zone.zoneId} (${distance.toFixed(1)}m) - Risque: ${zoneRisk}`)
+            console.log(`🔶 PROCHE centroïde zone ${zone.zoneId} (${distance.toFixed(1)}m) - Risque: ${zone.risk_numeric.toFixed(4)} (${zone.riskCategory})`)
           }
         }
       }
 
+      // Calculer le score de risque moyen pour cet itinéraire
+      const averageRiskScore = riskScores.length > 0 
+        ? riskScores.reduce((sum, score) => sum + score, 0) / riskScores.length 
+        : 0
+
+      // Calculer les statistiques par catégorie
+      const riskStats = detectedRisks.reduce((acc, risk) => {
+        const category = risk.riskCategory;
+        acc[category] = (acc[category] || 0) + 1;
+        return acc;
+      }, { élevé: 0, moyen: 0, faible: 0 });
+
       console.log(`📊 RÉSULTATS Itinéraire ${routeIndex + 1}:`)
-      console.log(`   🔴 Élevé: ${riskCounts["élevé"]} zones`)
-      console.log(`   🟡 Moyen: ${riskCounts["moyen"]} zones`)
-      console.log(`   🟢 Faible: ${riskCounts["faible"]} zones`)
+      console.log(`   📈 Score de risque moyen: ${averageRiskScore.toFixed(4)}`)
+      console.log(`   🔴 Élevé: ${riskStats["élevé"]} zones`)
+      console.log(`   🟡 Moyen: ${riskStats["moyen"]} zones`)
+      console.log(`   🟢 Faible: ${riskStats["faible"]} zones`)
       console.log(`   📍 Total zones détectées: ${detectedZoneIds.size}`)
       console.log(`   🎯 Points analysés: ${sampledGeometry.length}`)
 
       if (detectedRisks.length > 0) {
         console.log(`   📋 Exemples de détections:`)
         detectedRisks.slice(0, 5).forEach((risk) => {
-          console.log(`      - Zone ${risk.zone}: ${risk.risk} (${risk.method}, ${risk.distance?.toFixed(1) || 0}m)`)
+          console.log(`      - Zone ${risk.zone}: ${risk.risk_numeric.toFixed(4)} (${risk.riskCategory}) (${risk.method}, ${risk.distance?.toFixed(1) || 0}m)`)
         })
       } else {
         console.log(`   ⚠️ AUCUNE DÉTECTION - Vérifier les zones et la géométrie`)
@@ -276,7 +293,8 @@ router.post("/analyze-risk", async (req, res) => {
 
       return {
         routeIndex: routeIndex,
-        riskCounts,
+        averageRiskScore,
+        riskStats,
         totalPoints: sampledGeometry.length,
         detectedZones: Array.from(detectedZoneIds),
         detectedRisks: detectedRisks,
@@ -287,48 +305,36 @@ router.post("/analyze-risk", async (req, res) => {
     console.log("\n🛡️ CALCUL DU SAFE PATH")
 
     let bestRouteIndex = 0
-    let maxSafetyScore = -Infinity
+    let lowestRiskScore = Infinity
 
     const routeScores = riskAnalysis.map((analysis, idx) => {
-      const riskCounts = analysis.riskCounts
-      const highRiskPoints = riskCounts["élevé"] || 0
-      const mediumRiskPoints = riskCounts["moyen"] || 0
-      const lowRiskPoints = riskCounts["faible"] || 0
-      const totalRiskPoints = highRiskPoints + mediumRiskPoints + lowRiskPoints
-
-      // Calcul du safetyScore comme dans RouteAnalysis
-      let safetyScore = 100
-      if (totalRiskPoints > 0) {
-        const riskPercentage = Math.round((highRiskPoints / totalRiskPoints) * 100)
-        safetyScore = Math.max(0, 100 - riskPercentage)
-      }
-
+      const averageRiskScore = analysis.averageRiskScore
+      
       console.log(`🔍 Itinéraire ${idx + 1}:`)
-      console.log(`   🔴 Élevé: ${highRiskPoints}`)
-      console.log(`   🟡 Moyen: ${mediumRiskPoints}`)
-      console.log(`   🟢 Faible: ${lowRiskPoints}`)
-      console.log(`   📊 Safety Score: ${safetyScore}`)
+      console.log(`   📈 Score de risque: ${averageRiskScore.toFixed(4)}`)
+      console.log(`   🔴 Élevé: ${analysis.riskStats["élevé"]}`)
+      console.log(`   🟡 Moyen: ${analysis.riskStats["moyen"]}`)
+      console.log(`   🟢 Faible: ${analysis.riskStats["faible"]}`)
 
-      if (safetyScore > maxSafetyScore) {
-        maxSafetyScore = safetyScore
+      // On ne prend en compte que le score de risque pour déterminer le Safe Path
+      if (averageRiskScore < lowestRiskScore) {
+        lowestRiskScore = averageRiskScore
         bestRouteIndex = idx
-        console.log(`   🏆 NOUVEAU MEILLEUR: Itinéraire ${idx + 1} avec safetyScore ${safetyScore}`)
+        console.log(`   🏆 NOUVEAU MEILLEUR: Itinéraire ${idx + 1} avec score de risque ${averageRiskScore.toFixed(4)}`)
       }
 
       return {
         ...analysis,
-        safetyScore,
+        riskScore: averageRiskScore,
       }
     })
 
     console.log(`\n🛡️ SAFE PATH FINAL: Itinéraire ${bestRouteIndex + 1}`)
-    console.log(`📊 Safety Score: ${maxSafetyScore} (plus haut = meilleur)`)
+    console.log(`📊 Score de risque: ${lowestRiskScore.toFixed(4)}`)
 
     // Statistiques simplifiées
     const totalDetections = routeScores.reduce((sum, route) => {
-      return (
-        sum + (route.riskCounts["élevé"] || 0) + (route.riskCounts["moyen"] || 0) + (route.riskCounts["faible"] || 0)
-      )
+      return sum + Object.values(route.riskStats).reduce((a, b) => a + b, 0)
     }, 0)
 
     console.log(`\n📈 STATISTIQUES GLOBALES:`)
@@ -340,10 +346,10 @@ router.post("/analyze-risk", async (req, res) => {
       success: true,
       analysis: routeScores,
       safePathIndex: bestRouteIndex,
-      safePathScore: maxSafetyScore,
+      safePathRiskScore: lowestRiskScore,
       bestRoute: {
         index: bestRouteIndex,
-        safetyScore: maxSafetyScore,
+        riskScore: lowestRiskScore,
         details: routeScores[bestRouteIndex],
       },
       debug: {

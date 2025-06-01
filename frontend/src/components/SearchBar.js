@@ -1,9 +1,19 @@
+"use client"
+
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { placeIcons } from '../utils/iconUtils';
 import { haversineDistance, formatDistance, estimateTime, formatTime } from '../utils/routeUtils';
 import { faMapPin } from '@fortawesome/free-solid-svg-icons';
+import { useState, useEffect } from 'react';
 
 const SearchBar = ({ searchQuery, handleSearchChange, suggestions, handleSelectSuggestion, currentLocation, handlePlacePin }) => {
+  const [showPinOption, setShowPinOption] = useState(true);
+
+  useEffect(() => {
+    // Masquer l'option de pin quand une suggestion est sélectionnée
+    setShowPinOption(searchQuery === "");
+  }, [searchQuery]);
+
   return (
     <div className="search-bar">
       <div className="search-input-container">

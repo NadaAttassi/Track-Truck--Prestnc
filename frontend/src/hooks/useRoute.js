@@ -127,13 +127,14 @@ const useRoute = (fetchRiskAnalysis, zones, setError) => {
 
             // ✅ Créer une analyse par défaut
             const defaultAnalysis = processedRoutes.map(() => ({
-              totalPoints: 0,
-              riskCounts: {
+              averageRiskScore: 0,
+              riskStats: {
                 élevé: 0,
                 moyen: 0,
-                faible: 0,
-                inconnu: 0,
+                faible: 0
               },
+              detectedZones: [],
+              detectedRisks: []
             }))
             setRiskAnalysis(defaultAnalysis)
             setSafePathIndex(0)

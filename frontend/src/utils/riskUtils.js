@@ -2,12 +2,29 @@
  * Utilitaires pour l'analyse et l'affichage des risques
  */
 
-// Couleurs des zones de risque (sans inconnu)
+// Couleurs des zones de risque basées sur le score numérique
 export const riskColors = {
-  élevé: "#ff0000",
-  moyen: "#ff9900",
-  faible: "#33cc33",
-  safe: "#9900cc",
+  élevé: "#dc3545",    // Rouge pour risque >= 0.7
+  moyen: "#ffc107",    // Jaune pour risque >= 0.5
+  faible: "#28a745",   // Vert pour risque < 0.5
+  safe: "#6f42c1",     // Violet pour le safe path
+}
+
+// Seuils de risque
+export const RISK_THRESHOLDS = {
+  HIGH: 0.7,
+  MEDIUM: 0.5
+}
+
+/**
+ * Détermine la catégorie de risque basée sur le score numérique
+ * @param {number} riskScore - Score de risque entre 0 et 1
+ * @returns {string} - Catégorie de risque (élevé, moyen, faible)
+ */
+export const getRiskCategory = (riskScore) => {
+  if (riskScore >= RISK_THRESHOLDS.HIGH) return "élevé"
+  if (riskScore >= RISK_THRESHOLDS.MEDIUM) return "moyen"
+  return "faible"
 }
 
 /**
@@ -19,64 +36,32 @@ export const riskColors = {
  */
 export const getRouteButtonClass = (index, riskAnalysis, safePathIndex) => {
   if (riskAnalysis.length <= index || !riskAnalysis[index]) {
-    return "low-risk" // Par défaut faible risque au lieu d'inconnu
+    return "low-risk"
   }
 
   if (safePathIndex === index) {
     return "safe-path"
   }
 
-  const riskCounts = riskAnalysis[index].riskCounts
-  const highRisk = riskCounts["élevé"] || 0
-  const mediumRisk = riskCounts["moyen"] || 0
-  const lowRisk = riskCounts["faible"] || 0
+  const riskScore = riskAnalysis[index].averageRiskScore || 0
+  const category = getRiskCategory(riskScore)
 
-  const totalPoints = highRisk + mediumRisk + lowRisk
+  console.log(`Itinéraire ${index + 1} - Score de risque: ${riskScore.toFixed(4)} (${category})`)
 
-  if (totalPoints === 0) {
-    console.log(`Itinéraire ${index + 1} - Aucun point analysé, considéré comme faible risque.`)
-    return "low-risk"
+  switch (category) {
+    case "élevé": return "high-risk"
+    case "moyen": return "medium-risk"
+    default: return "low-risk"
   }
-
-  const riskLevels = [
-    { level: "high-risk", count: highRisk, label: "élevé" },
-    { level: "medium-risk", count: mediumRisk, label: "moyen" },
-    { level: "low-risk", count: lowRisk, label: "faible" },
-  ]
-
-  riskLevels.sort((a, b) => b.count - a.count)
-
-  console.log(`Itinéraire ${index + 1} - Points analysés: ${totalPoints}`)
-  console.log(`  Élevés: ${highRisk}, Moyens: ${mediumRisk}, Faibles: ${lowRisk}`)
-  console.log(`  Niveau de risque le plus fréquent: ${riskLevels[0].label} (${riskLevels[0].count} points)`)
-
-  return riskLevels[0].level
-}
-
-/**
- * Calcule le score de risque total pour une route
- * @param {object} riskCounts - Comptages de risque par niveau
- * @returns {number} - Score de risque total (plus bas = meilleur)
- */
-export const calculateRiskScore = (riskCounts) => {
-  if (!riskCounts) return 0
-
-  const high = riskCounts["élevé"] || 0
-  const medium = riskCounts["moyen"] || 0
-  const low = riskCounts["faible"] || 0
-
-  // ✅ CORRECTION: Même logique que le backend
-  // Plus il y a de zones à risque, plus le score est élevé (donc mauvais)
-  return high * 100 + medium * 10 + low * 1
 }
 
 /**
  * Détermine le niveau de risque global d'une route
- * @param {object} riskCounts - Comptages de risque par niveau
+ * @param {object} riskData - Données de risque
  * @returns {object} - Niveau de risque avec label et couleur
  */
-export const getRiskLevel = (riskCounts) => {
-  if (!riskCounts) {
+export const getRiskLevel = (riskData) => {
+  if (!riskData || typeof riskData.averageRiskScore !== 'number') {
     return {
       level: "low",
       label: "Risque faible",
@@ -85,55 +70,21 @@ export const getRiskLevel = (riskCounts) => {
     }
   }
 
-  const high = riskCounts["élevé"] || 0
-  const medium = riskCounts["moyen"] || 0
-  const low = riskCounts["faible"] || 0
-  const total = high + medium + low
+  const riskScore = riskData.averageRiskScore
 
-  if (total === 0) {
+  if (riskScore >= RISK_THRESHOLDS.HIGH) {
     return {
-      level: "low",
-      label: "Risque faible",
-      color: "text-green-600 bg-green-50",
-      icon: "🟢",
+      level: "very-high",
+      label: "Risque très élevé",
+      color: "text-red-700 bg-red-100",
+      icon: "🔴",
     }
-  }
-
-  if (high > 0) {
-    const highPercentage = (high / total) * 100
-    if (highPercentage > 20) {
-      return {
-        level: "very-high",
-        label: "Risque très élevé",
-        color: "text-red-700 bg-red-100",
-        icon: "🔴",
-      }
-    } else if (highPercentage > 10) {
-      return {
-        level: "high",
-        label: "Risque élevé",
-        color: "text-red-600 bg-red-50",
-        icon: "🔴",
-      }
-    }
-  }
-
-  if (medium > 0) {
-    const mediumPercentage = (medium / total) * 100
-    if (mediumPercentage > 30) {
-      return {
-        level: "medium-high",
-        label: "Risque moyen-élevé",
-        color: "text-orange-600 bg-orange-50",
-        icon: "🟠",
-      }
-    } else if (mediumPercentage > 15) {
-      return {
-        level: "medium",
-        label: "Risque moyen",
-        color: "text-yellow-600 bg-yellow-50",
-        icon: "🟡",
-      }
+  } else if (riskScore >= RISK_THRESHOLDS.MEDIUM) {
+    return {
+      level: "medium",
+      label: "Risque moyen",
+      color: "text-yellow-600 bg-yellow-50",
+      icon: "🟡",
     }
   }
 
@@ -153,33 +104,27 @@ export const getRiskLevel = (riskCounts) => {
 export const formatRiskData = (riskData) => {
   if (!riskData) {
     return {
-      total: 0,
-      high: 0,
-      medium: 0,
-      low: 0,
-      percentage: {
-        high: 0,
-        medium: 0,
-        low: 0,
-      },
+      riskScore: 0,
+      stats: {
+        total: 0,
+        élevé: 0,
+        moyen: 0,
+        faible: 0
+      }
     }
   }
 
-  const total = riskData.totalPoints || 0
-  const high = riskData.riskCounts?.["élevé"] || 0
-  const medium = riskData.riskCounts?.["moyen"] || 0
-  const low = riskData.riskCounts?.["faible"] || 0
+  const riskScore = riskData.averageRiskScore || 0
+  const stats = riskData.riskStats || {}
 
   return {
-    total,
-    high,
-    medium,
-    low,
-    percentage: {
-      high: total > 0 ? Math.round((high / total) * 100) : 0,
-      medium: total > 0 ? Math.round((medium / total) * 100) : 0,
-      low: total > 0 ? Math.round((low / total) * 100) : 0,
-    },
+    riskScore,
+    stats: {
+      total: (stats.élevé || 0) + (stats.moyen || 0) + (stats.faible || 0),
+      élevé: stats.élevé || 0,
+      moyen: stats.moyen || 0,
+      faible: stats.faible || 0
+    }
   }
 }
 
@@ -190,8 +135,8 @@ export const formatRiskData = (riskData) => {
  * @returns {number} - -1 si route1 est plus sûre, 1 si route2 est plus sûre, 0 si égales
  */
 export const compareRouteRisk = (route1Risk, route2Risk) => {
-  const score1 = calculateRiskScore(route1Risk?.riskCounts)
-  const score2 = calculateRiskScore(route2Risk?.riskCounts)
+  const score1 = route1Risk?.averageRiskScore || 0
+  const score2 = route2Risk?.averageRiskScore || 0
 
   if (score1 < score2) return -1
   if (score1 > score2) return 1
@@ -199,31 +144,19 @@ export const compareRouteRisk = (route1Risk, route2Risk) => {
 }
 
 /**
- * Génère un résumé textuel du risque d'une route
+ * Génère un résumé du risque pour l'affichage
  * @param {object} riskData - Données de risque
- * @returns {string} - Résumé textuel
+ * @returns {string} - Résumé formaté
  */
 export const generateRiskSummary = (riskData) => {
-  if (!riskData) return "Aucune donnée de risque disponible"
-
-  const formatted = formatRiskData(riskData)
-  const riskLevel = getRiskLevel(riskData.riskCounts)
-
-  if (formatted.total === 0) {
-    return "Aucun point analysé"
+  if (!riskData || typeof riskData.averageRiskScore !== 'number') {
+    return "Analyse de risque non disponible"
   }
 
-  if (formatted.high === 0 && formatted.medium === 0) {
-    return `Route sûre - ${formatted.low} points à faible risque`
-  }
+  const riskScore = riskData.averageRiskScore
+  const category = getRiskCategory(riskScore)
+  const stats = riskData.riskStats || {}
 
-  if (formatted.high > 0) {
-    return `${riskLevel.label} - ${formatted.high} points à risque élevé détectés`
-  }
-
-  if (formatted.medium > 0) {
-    return `${riskLevel.label} - ${formatted.medium} points à risque moyen`
-  }
-
-  return `${riskLevel.label}`
+  return `Score de risque: ${(riskScore * 100).toFixed(1)}% (${category})
+Zones: ${stats.élevé || 0} élevées, ${stats.moyen || 0} moyennes, ${stats.faible || 0} faibles`
 }

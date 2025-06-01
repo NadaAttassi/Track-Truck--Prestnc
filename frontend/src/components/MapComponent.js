@@ -7,7 +7,8 @@ import DirectionMarker from "./DirectionMarker"
 import { orangePinIcon, redPinIcon } from "../utils/iconUtils"
 import { riskColors } from "../utils/riskUtils"
 import "../components/DirectionMarker.css"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
+import L from "leaflet"
 
 // Composant pour gérer les événements de la carte
 const MapEvents = ({ onMapClick, isPinMode }) => {
@@ -36,8 +37,12 @@ const MapComponent = ({
   traveledPath,
   onMapClick,
   isPinMode,
+  isDraggable,
+  onTruckDrag
 }) => {
   const [remainingPath, setRemainingPath] = useState([])
+  const mapRef = useRef(null);
+  const truckMarkerRef = useRef(null);
 
   // Diviser l'itinéraire en chemin parcouru et chemin restant
   useEffect(() => {
@@ -64,6 +69,65 @@ const MapComponent = ({
     const remaining = routeGeometry.slice(closestPointIndex)
     setRemainingPath(remaining)
   }, [routeGeometry, currentLocation, isMonitoring, isSimulation])
+
+  useEffect(() => {
+    if (mapRef.current && currentLocation) {
+      // Mise à jour du marqueur du camion
+      if (truckMarkerRef.current) {
+        truckMarkerRef.current.setLatLng(currentLocation);
+        
+        // Mettre à jour la propriété draggable
+        if (isDraggable !== truckMarkerRef.current.dragging?._enabled) {
+          if (isDraggable) {
+            truckMarkerRef.current.dragging.enable();
+          } else {
+            truckMarkerRef.current.dragging.disable();
+          }
+        }
+      } else {
+        // Créer le marqueur du camion
+        const truckIcon = L.divIcon({
+          className: 'truck-icon',
+          html: '🚛',
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        });
+
+        const marker = L.marker(currentLocation, {
+          icon: truckIcon,
+          draggable: isDraggable
+        });
+
+        // Ajouter les événements de glisser-déposer
+        marker.on('dragstart', () => {
+          marker.getElement().classList.add('dragging');
+        });
+
+        marker.on('dragend', (e) => {
+          marker.getElement().classList.remove('dragging');
+          const newPos = e.target.getLatLng();
+          if (onTruckDrag) {
+            onTruckDrag([newPos.lat, newPos.lng]);
+          }
+        });
+
+        marker.addTo(mapRef.current);
+        truckMarkerRef.current = marker;
+      }
+
+      // Ajouter la classe CSS si le camion est déplaçable
+      if (truckMarkerRef.current) {
+        const element = truckMarkerRef.current.getElement();
+        if (element) {
+          if (isDraggable) {
+            element.classList.add('movable');
+          } else {
+            element.classList.remove('movable');
+          }
+        }
+      }
+    }
+  }, [currentLocation, isDraggable, onTruckDrag]);
 
   // Fonction pour calculer la distance entre deux points
   const calculateDistance = (lat1, lon1, lat2, lon2) => {

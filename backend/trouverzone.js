@@ -6,7 +6,7 @@ router.get('/forbidden-zones', async (req, res) => {
   try {
     console.log('Requête reçue pour /api/forbidden-zones');
 
-    const apiUrl = 'https://zoneaoi-r4id04xln-imane1.vercel.app/zones';
+    const apiUrl = 'https://risquezone-gnluzdl59-imane1.vercel.app/';
     const response = await axios.get(apiUrl);
     const apiZones = response.data;
 
@@ -30,6 +30,7 @@ router.get('/forbidden-zones', async (req, res) => {
         zoneId: zone.zoneId || 'unknown',
         geometry: coordinates,
         risk: zone.risk?.toLowerCase() || 'unknown',
+        risk_numeric: zone.risk_numeric || 0,
         tags: zone.tags || {}
       };
     }).filter(Boolean);

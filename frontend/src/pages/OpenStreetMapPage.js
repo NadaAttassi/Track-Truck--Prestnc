@@ -50,6 +50,8 @@ const OpenStreetMapPage = () => {
   const [isPinMode, setIsPinMode] = useState(false);
   const [pinPosition, setPinPosition] = useState(null);
   const [showRouteAnalysis, setShowRouteAnalysis] = useState(false);
+  const [isMonitoringTest, setIsMonitoringTest] = useState(false);
+  const [onTruckDrag, setOnTruckDrag] = useState(null);
 
   const {
     isMonitoring,
@@ -82,10 +84,14 @@ const OpenStreetMapPage = () => {
     setCurrentLocation,
   );
 
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertType, setAlertType] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [upcomingZones, setUpcomingZones] = useState([]);
+
   const findClosestPointOnRoute = useCallback(() => {
     if (!currentLocation || !routeGeometry || routeGeometry.length === 0 || !isMonitoring) return null;
 
-    let closestPoint = null;
     let minDistance = Number.POSITIVE_INFINITY;
     let closestIndex = 0;
 
@@ -107,7 +113,6 @@ const OpenStreetMapPage = () => {
 
       if (distance < minDistance) {
         minDistance = distance;
-        closestPoint = point;
         closestIndex = i;
       }
     }
@@ -117,40 +122,8 @@ const OpenStreetMapPage = () => {
       setTraveledPath(newTraveledPath);
     }
 
-    return { point: closestPoint, index: closestIndex };
-  }, [currentLocation, routeGeometry, isMonitoring]);
-
-  useEffect(() => {
-    if (isMonitoring) {
-      findClosestPointOnRoute();
-    }
-  }, [currentLocation, isMonitoring, findClosestPointOnRoute]);
-
-  const { showAlert, alertMessage, alertType, upcomingZones } = useZoneAlerts(
-    currentLocation,
-    zones,
-    queueSpeech,
-    isMonitoring,
-  );
-
-  const mapCenter = positionArrivee || currentLocation || [33.5731, -7.5898];
-
-  const toggleCard = (card) => {
-    console.log("🔄 Toggle card:", card, "current:", expandedCard);
-    if (expandedCard === card) {
-      setExpandedCard("none");
-    } else {
-      setExpandedCard(card);
-    }
-  };
-
-  const debouncedFetchSuggestions = useCallback(debounce(fetchSuggestions, 300), [fetchSuggestions]);
-
-  const handleSearchChange = (e) => {
-    const query = e.target.value;
-    setSearchQuery(query);
-    debouncedFetchSuggestions(query);
-  };
+    return { index: closestIndex };
+  }, [currentLocation, routeGeometry, isMonitoring, setTraveledPath]);
 
   const handleSelectSuggestion = useCallback(
     async (suggestion) => {
@@ -172,7 +145,6 @@ const OpenStreetMapPage = () => {
       setShowDetails(true);
       setSearchQuery(`${suggestion.name}, ${suggestion.city}`);
       setSuggestions([]);
-      console.log("PositionArrivee définie:", newPosition);
       setError(null);
       setRoutes([]);
       setRouteInstructions([]);
@@ -183,8 +155,14 @@ const OpenStreetMapPage = () => {
       setShowInstructions(false);
       setSelectedRouteIndex(0);
     },
-    [setError, setSearchQuery, setSuggestions],
+    [setError, setSearchQuery, setSuggestions, setPositionArrivee, setPlaceDetails, setShowDetails, setRoutes, setRouteInstructions, setRouteGeometry, setRemainingDistance, setRemainingTime, setShowRouteInfo, setShowInstructions, setSelectedRouteIndex],
   );
+
+  const handlePlacePin = useCallback(() => {
+    setIsPinMode(true);
+    setSuggestions([]);
+    setSearchQuery("");
+  }, [setIsPinMode, setSuggestions, setSearchQuery]);
 
   const handleDirectionsClick = useCallback(() => {
     console.log("🎯 handleDirectionsClick - État actuel:", { showRouteInfo, routesLength: routes.length });
@@ -291,42 +269,27 @@ const OpenStreetMapPage = () => {
     }
   };
 
-  const handlePlacePin = useCallback(() => {
-    setIsPinMode(true);
-    setSuggestions([]);
-    setSearchQuery("");
-  }, []);
-
-  const handleMapClick = useCallback(
-    (e) => {
-      if (isPinMode) {
-        const { lat, lng } = e.latlng;
-        console.log("Pin placé à:", lat, lng);
-        setPinPosition([lat, lng]);
-        setPositionArrivee([lat, lng]);
-        setPlaceDetails({
-          name: "Destination personnalisée",
-          type: "Point personnalisé",
-          city: "Position sélectionnée",
-          lat: lat.toString(),
-          lon: lng.toString(),
-        });
-        setShowDetails(true);
-        setIsPinMode(false);
-        setError(null);
-
-        setRoutes([]);
-        setRouteInstructions([]);
-        setRouteGeometry([]);
-        setRemainingDistance(0);
-        setRemainingTime(0);
-        setShowRouteInfo(false);
-        setShowInstructions(false);
-        setSelectedRouteIndex(0);
-      }
-    },
-    [isPinMode],
-  );
+  const handleMapClick = useCallback((e) => {
+    if (isPinMode) {
+      const { lat, lng } = e.latlng;
+      setPinPosition([lat, lng]);
+      setPositionArrivee([lat, lng]);
+      setPlaceDetails({
+        name: "Position personnalisée",
+        type: "Pin",
+        city: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+        lat: lat,
+        lon: lng,
+      });
+      setShowDetails(true);
+      setIsPinMode(false);
+      setSuggestions([]);
+      setSearchQuery("");
+    } else {
+      setSuggestions([]);
+      setSearchQuery("");
+    }
+  }, [isPinMode]);
 
   const handleShowAnalysis = useCallback(() => {
     console.log("📊 Ouverture de l'analyse via le bouton Analyse");
@@ -442,7 +405,7 @@ const OpenStreetMapPage = () => {
       const closest = findClosestPointOnRoute();
       if (!closest) return;
 
-      const { point: closestPoint } = closest;
+      const { index: closestIndex } = closest;
 
       // Trouver l'instruction la plus proche en comparant les coordonnées
       let closestInstructionIndex = -1;
@@ -489,7 +452,7 @@ const OpenStreetMapPage = () => {
       <div className={`open-street-map-page ${isPinMode ? "map-pin-mode" : ""}`}>
         <div className="map-container">
           <MapComponent
-            mapCenter={mapCenter}
+            mapCenter={positionArrivee || currentLocation || [33.5731, -7.5898]}
             currentLocation={currentLocation}
             positionArrivee={positionArrivee}
             routeGeometry={routeGeometry}
@@ -502,6 +465,8 @@ const OpenStreetMapPage = () => {
             traveledPath={traveledPath}
             onMapClick={handleMapClick}
             isPinMode={isPinMode}
+            isDraggable={isMonitoringTest}
+            onTruckDrag={onTruckDrag}
           />
           {isLoadingLocation && !currentLocation && (
             <div className="loading-overlay">
@@ -517,7 +482,10 @@ const OpenStreetMapPage = () => {
           )}
           <SearchBar
             searchQuery={searchQuery}
-            handleSearchChange={handleSearchChange}
+            handleSearchChange={(e) => {
+              setSearchQuery(e.target.value);
+              fetchSuggestions(e.target.value);
+            }}
             suggestions={suggestions}
             handleSelectSuggestion={handleSelectSuggestion}
             currentLocation={currentLocation}
@@ -539,7 +507,6 @@ const OpenStreetMapPage = () => {
                   disabled={routes.length === 0}
                   className="monitoring-button"
                 >
-                  <i className="fas fa-play"></i>
                   Démarrer
                 </button>
 
@@ -551,27 +518,35 @@ const OpenStreetMapPage = () => {
                   disabled={routes.length === 0}
                   className="simulation-mode"
                 >
-                  <i className="fas fa-robot"></i>
                   Mode Simulation
                 </button>
               </>
             ) : (
               <>
-                <button
-                  onClick={() => {
-                    stopMonitoring();
-                    setTraveledPath([]);
-                  }}
-                  className="stop-button"
-                >
-                  <i className="fas fa-stop"></i>
-                  Arrêter
-                </button>
-
-                {isSimulationMode && (
+                {!isSimulationMode ? (
+                  <button
+                    onClick={() => {
+                      stopMonitoring();
+                      setTraveledPath([]);
+                    }}
+                    className="stop-button"
+                  >
+                    Arrêter
+                  </button>
+                ) : (
                   <>
-                    <div className="simulation-progress">🚛 {simulationProgress.toFixed(1)}%</div>
-
+                    <button
+                      onClick={() => {
+                        stopMonitoring();
+                        setTraveledPath([]);
+                      }}
+                      className="stop-button"
+                    >
+                      Arrêter
+                    </button>
+                    <div className="simulation-progress">
+                      <span className="truck-icon">🚛</span>{simulationProgress.toFixed(1)}%
+                    </div>
                     <select
                       value={simulationSpeed}
                       onChange={(e) => setSimulationSpeed(Number(e.target.value))}
@@ -596,7 +571,14 @@ const OpenStreetMapPage = () => {
             placeDetails={placeDetails}
             showDetails={showDetails}
             expandedCard={expandedCard}
-            toggleCard={toggleCard}
+            toggleCard={(card) => {
+              console.log("🔄 Toggle card:", card, "current:", expandedCard);
+              if (expandedCard === card) {
+                setExpandedCard("none");
+              } else {
+                setExpandedCard(card);
+              }
+            }}
             handleDirectionsClick={handleDirectionsClick}
             showRouteInfo={showRouteInfo}
             isCalculatingRoute={isCalculatingRoute}
@@ -608,7 +590,14 @@ const OpenStreetMapPage = () => {
             remainingDistance={remainingDistance}
             remainingTime={remainingTime}
             expandedCard={expandedCard}
-            toggleCard={toggleCard}
+            toggleCard={(card) => {
+              console.log("🔄 Toggle card:", card, "current:", expandedCard);
+              if (expandedCard === card) {
+                setExpandedCard("none");
+              } else {
+                setExpandedCard(card);
+              }
+            }}
             riskAnalysis={riskAnalysis}
             selectedRouteIndex={selectedRouteIndex}
             safePathIndex={safePathIndex}

@@ -1,0 +1,192 @@
+.route-analysis-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 16px;
+  padding: 24px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  z-index: 2000;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.route-analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+.route-analysis-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.close-button:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.route-analysis-content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.analysis-section {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f3f4f6;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title i {
+  color: #6366f1;
+}
+
+.risk-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.risk-stat-item {
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.risk-high {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  border: 1px solid #ef4444;
+}
+
+.risk-medium {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 1px solid #f59e0b;
+}
+
+.risk-low {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  border: 1px solid #22c55e;
+}
+
+.risk-value {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.risk-label {
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.route-comparison {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.route-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.route-item:hover {
+  background: #f3f4f6;
+  transform: translateY(-1px);
+}
+
+.route-item.selected {
+  background: #e0e7ff;
+  border: 1px solid #6366f1;
+}
+
+.route-item.safe-path {
+  background: linear-gradient(135deg, #e0e7ff, #dbeafe);
+  border: 1px solid #6366f1;
+}
+
+.route-number {
+  font-weight: 600;
+  margin-right: 12px;
+  color: #4b5563;
+}
+
+.route-stats {
+  display: flex;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.route-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.route-stat i {
+  color: #6366f1;
+}
+
+.chart-container {
+  margin-top: 20px;
+  height: 200px;
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  .route-analysis-modal {
+    width: 95%;
+    padding: 16px;
+  }
+
+  .route-analysis-content {
+    grid-template-columns: 1fr;
+  }
+
+  .risk-stats {
+    grid-template-columns: 1fr;
+  }
+} 

@@ -27,12 +27,12 @@ export const haversineDistance = (point1, point2) => {
 }
 
 /**
- * Estime le temps de trajet basé sur la distance
+ * Estime le temps de trajet basé sur la distance et le type de route
  * @param {number} distanceInMeters - Distance en mètres
- * @param {number} averageSpeedKmh - Vitesse moyenne en km/h (défaut: 50)
+ * @param {number} averageSpeedKmh - Vitesse moyenne en km/h (défaut: 90)
  * @returns {number} - Temps estimé en minutes
  */
-export const estimateTime = (distanceInMeters, averageSpeedKmh = 50) => {
+export const estimateTime = (distanceInMeters, averageSpeedKmh = 90) => {
   const distanceInKm = distanceInMeters / 1000
   const timeInHours = distanceInKm / averageSpeedKmh
   return timeInHours * 60 // Temps en minutes

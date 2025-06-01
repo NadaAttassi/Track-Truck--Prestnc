@@ -27,9 +27,9 @@ const RouteInfo = ({
     return null
   }
 
-  const getRouteButtonStyle = (index, riskCounts) => {
-    if (!riskCounts) {
-      console.log(`⚠️ Route ${index + 1}: Aucun riskCounts disponible`)
+  const getRouteButtonStyle = (index, riskData) => {
+    if (!riskData || typeof riskData.averageRiskScore !== 'number') {
+      console.log(`⚠️ Route ${index + 1}: Aucun score de risque disponible`)
       return {
         backgroundColor: "#6c757d",
         color: "white",
@@ -37,20 +37,11 @@ const RouteInfo = ({
       }
     }
 
-    const highRisk = riskCounts["élevé"] || 0
-    const mediumRisk = riskCounts["moyen"] || 0
-    const lowRisk = riskCounts["faible"] || 0
-    const totalRisk = highRisk + mediumRisk + lowRisk
-
-    // Calculer le safetyScore comme dans RouteAnalysis
-    let safetyScore = 100
-    if (totalRisk > 0) {
-      const riskPercentage = Math.round((highRisk / totalRisk) * 100)
-      safetyScore = Math.max(0, 100 - riskPercentage)
-    }
+    const riskScore = riskData.averageRiskScore
+    const riskStats = riskData.riskStats || {}
 
     console.log(
-      `🔍 Route ${index + 1}: highRisk=${highRisk}, mediumRisk=${mediumRisk}, lowRisk=${lowRisk}, totalRisk=${totalRisk}, safetyScore=${safetyScore}, safePathIndex=${safePathIndex}, index=${index}`,
+      `🔍 Route ${index + 1}: riskScore=${riskScore.toFixed(4)}, élevé=${riskStats["élevé"] || 0}, moyen=${riskStats["moyen"] || 0}, faible=${riskStats["faible"] || 0}, safePathIndex=${safePathIndex}, index=${index}`,
     )
 
     // Vérifier si la route est "SAFE" uniquement si elle est safePathIndex
@@ -65,31 +56,22 @@ const RouteInfo = ({
       }
     }
 
-    if (totalRisk === 0) {
+    // Utiliser le score de risque numérique pour déterminer la couleur
+    if (riskScore >= 0.7) {
       return {
-        backgroundColor: "#6c757d",
-        color: "white",
-        border: "1px solid #6c757d",
-      }
-    }
-
-    const maxKnownRisk = Math.max(highRisk, mediumRisk, lowRisk)
-
-    if (highRisk === maxKnownRisk && highRisk > 0) {
-      return {
-        backgroundColor: "#dc3545",
+        backgroundColor: "#dc3545", // Rouge pour risque élevé
         color: "white",
         border: "2px solid #dc3545",
       }
-    } else if (mediumRisk === maxKnownRisk && mediumRisk > 0) {
+    } else if (riskScore >= 0.5) {
       return {
-        backgroundColor: "#ffc107",
+        backgroundColor: "#ffc107", // Jaune pour risque moyen
         color: "black",
         border: "2px solid #ffc107",
       }
     } else {
       return {
-        backgroundColor: "#28a745",
+        backgroundColor: "#28a745", // Vert pour risque faible
         color: "white",
         border: "2px solid #28a745",
       }
@@ -122,11 +104,11 @@ const RouteInfo = ({
     <div
       style={{
         position: "fixed",
-        top: "200px",
+        top: "190px",
         right: "0",
         width: isExpanded ? "350px" : "40px",
         height: "auto",
-        maxHeight: "400px",
+        maxHeight: "calc(100vh - 300px)",
         background: "#fff",
         borderRadius: "10px 0 0 10px",
         boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
@@ -212,8 +194,8 @@ const RouteInfo = ({
               }}
             >
               {routes.map((route, index) => {
-                const riskCounts = riskAnalysis && riskAnalysis[index] ? riskAnalysis[index].riskCounts : null
-                const buttonStyle = getRouteButtonStyle(index, riskCounts)
+                const riskData = riskAnalysis && riskAnalysis[index] ? riskAnalysis[index] : null
+                const buttonStyle = getRouteButtonStyle(index, riskData)
                 const isSelected = selectedRouteIndex === index
                 return (
                   <button
@@ -233,7 +215,7 @@ const RouteInfo = ({
                     onClick={() => handleRouteSelection(index)}
                   >
                     <div style={{ fontWeight: "bold" }}>Route {index + 1}</div>
-                    {riskCounts && safePathIndex === index && (
+                    {riskData && safePathIndex === index && (
                       <div
                         style={{
                           fontSize: "10px",
@@ -279,7 +261,7 @@ const RouteInfo = ({
                     textAlign: "center",
                   }}
                 >
-                  <div style={{ fontWeight: "bold", fontSize: "18px" }}>{currentRiskData.riskCounts["élevé"] || 0}</div>
+                  <div style={{ fontWeight: "bold", fontSize: "18px" }}>{currentRiskData.riskStats?.["élevé"] || 0}</div>
                   <div style={{ fontSize: "10px" }}>Élevés</div>
                 </div>
                 <div
@@ -291,7 +273,7 @@ const RouteInfo = ({
                     textAlign: "center",
                   }}
                 >
-                  <div style={{ fontWeight: "bold", fontSize: "18px" }}>{currentRiskData.riskCounts["moyen"] || 0}</div>
+                  <div style={{ fontWeight: "bold", fontSize: "18px" }}>{currentRiskData.riskStats?.["moyen"] || 0}</div>
                   <div style={{ fontSize: "10px" }}>Moyens</div>
                 </div>
                 <div
@@ -304,7 +286,7 @@ const RouteInfo = ({
                   }}
                 >
                   <div style={{ fontWeight: "bold", fontSize: "18px" }}>
-                    {currentRiskData.riskCounts["faible"] || 0}
+                    {currentRiskData.riskStats?.["faible"] || 0}
                   </div>
                   <div style={{ fontSize: "10px" }}>Faibles</div>
                 </div>
