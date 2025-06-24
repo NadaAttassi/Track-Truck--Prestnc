@@ -50,8 +50,19 @@ const OpenStreetMapPage = () => {
   const [isPinMode, setIsPinMode] = useState(false);
   const [pinPosition, setPinPosition] = useState(null);
   const [showRouteAnalysis, setShowRouteAnalysis] = useState(false);
+  const [hasSelectedDestination, setHasSelectedDestination] = useState(false);
   const [isMonitoringTest, setIsMonitoringTest] = useState(false);
   const [onTruckDrag, setOnTruckDrag] = useState(null);
+
+  // Définir la fonction handleSearchChange
+  const handleSearchChange = useCallback((e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    fetchSuggestions(value);
+    if (value) {
+      setHasSelectedDestination(false);
+    }
+  }, [setSearchQuery, fetchSuggestions]);
 
   const {
     isMonitoring,
@@ -135,6 +146,7 @@ const OpenStreetMapPage = () => {
       }
       const newPosition = [lat, lon];
       setPositionArrivee(newPosition);
+      setPinPosition(null); // Effacer le pin si présent
       setPlaceDetails({
         name: suggestion.name,
         type: suggestion.type || "Lieu",
@@ -154,9 +166,23 @@ const OpenStreetMapPage = () => {
       setShowRouteInfo(false);
       setShowInstructions(false);
       setSelectedRouteIndex(0);
+      setHasSelectedDestination(true); // Marquer qu'une destination a été sélectionnée
     },
     [setError, setSearchQuery, setSuggestions, setPositionArrivee, setPlaceDetails, setShowDetails, setRoutes, setRouteInstructions, setRouteGeometry, setRemainingDistance, setRemainingTime, setShowRouteInfo, setShowInstructions, setSelectedRouteIndex],
   );
+  
+  const handleClearDestination = useCallback(() => {
+    setPositionArrivee(null);
+    setPinPosition(null);
+    setPlaceDetails(null);
+    setSearchQuery("");
+    setHasSelectedDestination(false);
+    setRoutes([]);
+    setRouteInstructions([]);
+    setRouteGeometry([]);
+    setShowRouteInfo(false);
+    setSuggestions([]); // Réinitialiser les suggestions
+  }, [setSearchQuery]);
 
   const handlePlacePin = useCallback(() => {
     setIsPinMode(true);
@@ -165,66 +191,72 @@ const OpenStreetMapPage = () => {
   }, [setIsPinMode, setSuggestions, setSearchQuery]);
 
   const handleDirectionsClick = useCallback(() => {
-    console.log("🎯 handleDirectionsClick - État actuel:", { showRouteInfo, routesLength: routes.length });
+    console.log("🎯 handleDirectionsClick - État actuel:", { showRouteInfo, routesLength: routes?.length || 0 });
 
     if (showRouteInfo) {
       setShowRouteInfo(false);
       setShowInstructions(false);
       setExpandedCard("place");
-    } else if (routes.length > 0) {
-      console.log("✅ Affichage des routes existantes");
+      return;
+    }
+
+    // Réinitialiser l'état de l'itinéraire avant de recalculer
+    setRoutes([]);
+    setRouteInstructions([]);
+    setRouteGeometry([]);
+    setRemainingDistance(0);
+    setRemainingTime(0);
+    setShowRouteInfo(true);
+    setShowInstructions(false);
+    setSelectedRouteIndex(0);
+    
+    console.log("🔄 Calcul de nouveaux itinéraires");
+    console.log("handleDirectionsClick - currentLocation:", currentLocation, "positionArrivee:", positionArrivee);
+
+    if (
+      !currentLocation ||
+      !Array.isArray(currentLocation) ||
+      currentLocation.length !== 2 ||
+      isNaN(currentLocation[0]) ||
+      isNaN(currentLocation[1])
+    ) {
+      setError(
+        "Position de départ non définie. Veuillez activer la géolocalisation ou entrer une position manuellement.",
+      );
+      return;
+    }
+    if (
+      !positionArrivee ||
+      !Array.isArray(positionArrivee) ||
+      positionArrivee.length !== 2 ||
+      isNaN(positionArrivee[0]) ||
+      isNaN(positionArrivee[1])
+    ) {
+      setError("Position d'arrivée non définie. Veuillez sélectionner une destination.");
+      return;
+    }
+
+    setIsCalculatingRoute(true);
+    fetchRouteFromServer(
+      currentLocation,
+      positionArrivee,
+      setRoutes,
+      setRouteInstructions,
+      setRouteGeometry,
+      setRemainingDistance,
+      setRemainingTime,
+      setError,
+      setLoading,
+      setSelectedRouteIndex,
+      setShowInstructions,
+      setRiskAnalysis,
+      setSafePathIndex,
+      setShowRouteInfo,
+    ).finally(() => {
+      setIsCalculatingRoute(false);
       setShowRouteInfo(true);
       setExpandedCard("route");
-      setShowInstructions(false);
-    } else {
-      console.log("🔄 Calcul de nouveaux itinéraires");
-      console.log("handleDirectionsClick - currentLocation:", currentLocation, "positionArrivee:", positionArrivee);
-
-      if (
-        !currentLocation ||
-        !Array.isArray(currentLocation) ||
-        currentLocation.length !== 2 ||
-        isNaN(currentLocation[0]) ||
-        isNaN(currentLocation[1])
-      ) {
-        setError(
-          "Position de départ non définie. Veuillez activer la géolocalisation ou entrer une position manuellement.",
-        );
-        return;
-      }
-      if (
-        !positionArrivee ||
-        !Array.isArray(positionArrivee) ||
-        positionArrivee.length !== 2 ||
-        isNaN(positionArrivee[0]) ||
-        isNaN(positionArrivee[1])
-      ) {
-        setError("Position d'arrivée non définie. Veuillez sélectionner une destination.");
-        return;
-      }
-
-      setIsCalculatingRoute(true);
-      fetchRouteFromServer(
-        currentLocation,
-        positionArrivee,
-        setRoutes,
-        setRouteInstructions,
-        setRouteGeometry,
-        setRemainingDistance,
-        setRemainingTime,
-        setError,
-        setLoading,
-        setSelectedRouteIndex,
-        setShowInstructions,
-        setRiskAnalysis,
-        setSafePathIndex,
-        setShowRouteInfo,
-      ).finally(() => {
-        setIsCalculatingRoute(false);
-        setShowRouteInfo(true);
-        setExpandedCard("route");
-      });
-    }
+    });
   }, [
     showRouteInfo,
     routes,
@@ -285,9 +317,17 @@ const OpenStreetMapPage = () => {
       setIsPinMode(false);
       setSuggestions([]);
       setSearchQuery("");
+      // Réinitialiser l'état de l'itinéraire
+      setRoutes([]);
+      setRouteInstructions([]);
+      setRouteGeometry([]);
+      setRemainingDistance(0);
+      setRemainingTime(0);
+      setShowRouteInfo(false);
+      setShowInstructions(false);
+      setSelectedRouteIndex(0);
     } else {
       setSuggestions([]);
-      setSearchQuery("");
     }
   }, [isPinMode]);
 
@@ -482,14 +522,12 @@ const OpenStreetMapPage = () => {
           )}
           <SearchBar
             searchQuery={searchQuery}
-            handleSearchChange={(e) => {
-              setSearchQuery(e.target.value);
-              fetchSuggestions(e.target.value);
-            }}
+            handleSearchChange={handleSearchChange}
             suggestions={suggestions}
             handleSelectSuggestion={handleSelectSuggestion}
             currentLocation={currentLocation}
             handlePlacePin={handlePlacePin}
+            hasSelectedDestination={hasSelectedDestination}
           />
           <div className="show-zones-button">
             <button onClick={handleShowZonesClick} className={showZones ? "selected" : ""}>

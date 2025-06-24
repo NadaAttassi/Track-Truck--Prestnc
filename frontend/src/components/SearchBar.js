@@ -6,13 +6,9 @@ import { haversineDistance, formatDistance, estimateTime, formatTime } from '../
 import { faMapPin } from '@fortawesome/free-solid-svg-icons';
 import { useState, useEffect } from 'react';
 
-const SearchBar = ({ searchQuery, handleSearchChange, suggestions, handleSelectSuggestion, currentLocation, handlePlacePin }) => {
-  const [showPinOption, setShowPinOption] = useState(true);
-
-  useEffect(() => {
-    // Masquer l'option de pin quand une suggestion est sélectionnée
-    setShowPinOption(searchQuery === "");
-  }, [searchQuery]);
+const SearchBar = ({ searchQuery, handleSearchChange, suggestions, handleSelectSuggestion, currentLocation, handlePlacePin, hasSelectedDestination }) => {
+  // L'option de pin s'affiche toujours sauf quand une destination est sélectionnée
+  const showPinOption = !hasSelectedDestination;
 
   return (
     <div className="search-bar">
@@ -31,16 +27,18 @@ const SearchBar = ({ searchQuery, handleSearchChange, suggestions, handleSelectS
       </div>
       {(suggestions.length > 0 || searchQuery) && (
         <ul className="suggestions-dropdown">
-          <li 
-            className="pin-option"
-            onClick={handlePlacePin}
-          >
-            <FontAwesomeIcon icon={faMapPin} className="suggestion-icon" />
-            <div className="suggestion-content">
-              <div className="place-name">Placer un pin sur la carte</div>
-              <div className="place-details">Cliquez pour placer votre destination manuellement</div>
-            </div>
-          </li>
+          {showPinOption && (
+            <li 
+              className="pin-option"
+              onClick={handlePlacePin}
+            >
+              <FontAwesomeIcon icon={faMapPin} className="suggestion-icon" />
+              <div className="suggestion-content">
+                <div className="place-name">Placer un pin sur la carte</div>
+                <div className="place-details">Cliquez pour placer votre destination manuellement</div>
+              </div>
+            </li>
+          )}
           {suggestions.map((suggestion, index) => {
             const distance =
               currentLocation && suggestion.lat && suggestion.lon
