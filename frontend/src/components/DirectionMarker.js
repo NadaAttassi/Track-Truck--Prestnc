@@ -2,71 +2,74 @@
 
 import { useEffect, useState, useRef } from "react"
 import { Marker, useMap } from "react-leaflet"
-import { createTruckIcon } from "./TruckIcon"
 import L from "leaflet"
-import "./DirectionMarker.css"
+import "leaflet-rotatedmarker"
 
-const DirectionMarker = ({ position, heading, routeGeometry, isMonitoring, isSimulation = false }) => {
-  const [truckIcon, setTruckIcon] = useState(null)
-  const [isMoving, setIsMoving] = useState(false)
+// Création d'une icône personnalisée pour la flèche de direction (sans cercle bleu)
+const createDirectionIcon = (heading) => {
+  return L.divIcon({
+    html: `
+      <div class="direction-marker truck-pulse" style="transform: rotate(${heading}deg)">
+        <div style="font-size: 32px;">🚛</div>
+      </div>
+    `,
+    className: "direction-marker-container",
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  })
+}
+
+const DirectionMarker = ({ position, heading, routeGeometry, isMonitoring }) => {
+  const [directionIcon, setDirectionIcon] = useState(null)
   const map = useMap()
   const lastPositionRef = useRef(null)
   const pathRef = useRef(null)
-  const lastUpdateTime = useRef(Date.now())
 
   useEffect(() => {
     if (position) {
-      // Détecter si le camion bouge
-      const now = Date.now()
-      const timeDiff = now - lastUpdateTime.current
+      // Créer l'icône de direction même si heading est null
+      const icon = createDirectionIcon(heading || 0)
+      setDirectionIcon(icon)
 
-      if (lastPositionRef.current && timeDiff > 0) {
-        const distance = L.latLng(lastPositionRef.current).distanceTo(L.latLng(position))
-        const speed = distance / (timeDiff / 1000) // mètres par seconde
-        setIsMoving(speed > 0.1) // Considérer comme en mouvement si > 0.1 m/s
-      }
-
-      // 🚛 Utiliser l'icône de camion améliorée
-      const icon = createTruckIcon(heading || 0, isMoving)
-      setTruckIcon(icon)
-
-      // Centrer la carte sur la position actuelle
-      if ((isMonitoring || isSimulation) && map) {
+      // Centrer la carte sur la position actuelle avec un léger décalage vers le haut
+      if (map && isMonitoring) {
         map.panTo(position)
       }
 
-      // Mettre à jour le chemin parcouru
-      if ((isMonitoring || isSimulation) && routeGeometry && routeGeometry.length > 0) {
+      // Mettre à jour le chemin parcouru si on est en mode monitoring
+      if (isMonitoring && routeGeometry && routeGeometry.length > 0) {
+        // Si c'est la première position ou si la position a changé significativement
         if (
           !lastPositionRef.current ||
           lastPositionRef.current[0] !== position[0] ||
           lastPositionRef.current[1] !== position[1]
         ) {
+          // Mettre à jour la dernière position connue
           lastPositionRef.current = position
-          lastUpdateTime.current = now
 
-          // Créer ou mettre à jour le chemin parcouru avec de meilleures couleurs
+          // Créer ou mettre à jour le chemin parcouru
           if (!pathRef.current) {
             pathRef.current = L.polyline([position], {
-              color: isSimulation ? "#9333ea" : "#00d4aa", // Violet pour simulation, turquoise pour réel
-              weight: 6,
-              opacity: 0.9,
-              dashArray: isSimulation ? "15, 10" : "none",
+              color: "#3388ff",
+              weight: 5,
+              opacity: 0.7,
+              dashArray: "10, 10",
               className: "traveled-path",
             }).addTo(map)
           } else {
+            // Ajouter la nouvelle position au chemin
             pathRef.current.addLatLng(position)
 
-            // Limiter le chemin parcouru aux 30 derniers points
-            if (pathRef.current.getLatLngs().length > 30) {
+            // Limiter le chemin parcouru aux 20 derniers points pour qu'il s'efface progressivement
+            if (pathRef.current.getLatLngs().length > 20) {
               const points = pathRef.current.getLatLngs()
-              pathRef.current.setLatLngs(points.slice(points.length - 30))
+              pathRef.current.setLatLngs(points.slice(points.length - 20))
             }
           }
         }
       }
     }
-  }, [position, heading, map, isMonitoring, isSimulation, routeGeometry, isMoving])
+  }, [position, heading, map, isMonitoring, routeGeometry])
 
   // Nettoyer le chemin parcouru quand le composant est démonté
   useEffect(() => {
@@ -77,9 +80,15 @@ const DirectionMarker = ({ position, heading, routeGeometry, isMonitoring, isSim
     }
   }, [map])
 
-  if (!position || !truckIcon) return null
+  if (!position || !directionIcon) return null
 
-  return <Marker position={position} icon={truckIcon} zIndexOffset={1000} />
+  return (
+    <Marker
+      position={position}
+      icon={directionIcon}
+      zIndexOffset={1000} // S'assurer que la flèche est au-dessus des autres marqueurs
+    />
+  )
 }
 
 export default DirectionMarker

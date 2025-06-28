@@ -19,7 +19,7 @@ const useRoute = (fetchRiskAnalysis, zones, setError) => {
       setShowInstructions,
       setRiskAnalysis,
       setSafePathIndex,
-      setShowRouteInfo, // ✅ NOUVEAU : Ajouter ce paramètre
+      setShowRouteInfo,
     ) => {
       if (
         !startPoint ||

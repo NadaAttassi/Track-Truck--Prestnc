@@ -1,14 +1,14 @@
 "use client"
 
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, useMapEvents } from "react-leaflet"
-import MapUpdater from "./MapUpdater"
-import MapResizeHandler from "./MapResizeHandler"
-import DirectionMarker from "./DirectionMarker"
-import { orangePinIcon, redPinIcon } from "../utils/iconUtils"
-import { riskColors } from "../utils/riskUtils"
-import "../components/DirectionMarker.css"
-import { useEffect, useState, useRef } from "react"
-import L from "leaflet"
+import React, { useEffect, useState, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, useMapEvents } from "react-leaflet";
+import MapUpdater from "./MapUpdater";
+import MapResizeHandler from "./MapResizeHandler";
+import DirectionMarker from "./DirectionMarker";
+import { bluePinIcon, redPinIcon } from "../utils/iconUtils";
+import { riskColors } from "../utils/riskUtils";
+import "../components/DirectionMarker.css";
+import L from "leaflet";
 
 // Composant pour gérer les événements de la carte
 const MapEvents = ({ onMapClick, isPinMode }) => {
@@ -22,26 +22,26 @@ const MapEvents = ({ onMapClick, isPinMode }) => {
   return null
 }
 
-const MapComponent = ({
-  mapCenter,
-  currentLocation,
-  positionArrivee,
-  routeGeometry,
-  selectedRouteIndex,
-  safePathIndex,
-  showZones,
-  zones,
-  heading,
-  isMonitoring,
-  isSimulation,
-  traveledPath,
-  onMapClick,
-  isPinMode,
-  isDraggable,
-  onTruckDrag
-}) => {
-  const [remainingPath, setRemainingPath] = useState([])
-  const mapRef = useRef(null);
+const MapComponent = React.forwardRef((props, ref) => {
+  const {
+    mapCenter,
+    currentLocation,
+    positionArrivee,
+    routeGeometry,
+    selectedRouteIndex,
+    safePathIndex,
+    showZones,
+    zones,
+    heading,
+    isMonitoring,
+    isSimulation,
+    onMapClick,
+    isPinMode,
+  } = props;
+
+  const [remainingPath, setRemainingPath] = useState([]);
+  const internalMapRef = useRef(null);
+  const mapRef = ref || internalMapRef;
   const truckMarkerRef = useRef(null);
 
   // Diviser l'itinéraire en chemin parcouru et chemin restant
@@ -72,62 +72,12 @@ const MapComponent = ({
 
   useEffect(() => {
     if (mapRef.current && currentLocation) {
-      // Mise à jour du marqueur du camion
       if (truckMarkerRef.current) {
-        truckMarkerRef.current.setLatLng(currentLocation);
-        
-        // Mettre à jour la propriété draggable
-        if (isDraggable !== truckMarkerRef.current.dragging?._enabled) {
-          if (isDraggable) {
-            truckMarkerRef.current.dragging.enable();
-          } else {
-            truckMarkerRef.current.dragging.disable();
-          }
-        }
-      } else {
-        // Créer le marqueur du camion
-        const truckIcon = L.divIcon({
-          className: 'truck-icon',
-          html: '🚛',
-          iconSize: [30, 30],
-          iconAnchor: [15, 15]
-        });
-
-        const marker = L.marker(currentLocation, {
-          icon: truckIcon,
-          draggable: isDraggable
-        });
-
-        // Ajouter les événements de glisser-déposer
-        marker.on('dragstart', () => {
-          marker.getElement().classList.add('dragging');
-        });
-
-        marker.on('dragend', (e) => {
-          marker.getElement().classList.remove('dragging');
-          const newPos = e.target.getLatLng();
-          if (onTruckDrag) {
-            onTruckDrag([newPos.lat, newPos.lng]);
-          }
-        });
-
-        marker.addTo(mapRef.current);
-        truckMarkerRef.current = marker;
-      }
-
-      // Ajouter la classe CSS si le camion est déplaçable
-      if (truckMarkerRef.current) {
-        const element = truckMarkerRef.current.getElement();
-        if (element) {
-          if (isDraggable) {
-            element.classList.add('movable');
-          } else {
-            element.classList.remove('movable');
-          }
-        }
+        mapRef.current.removeLayer(truckMarkerRef.current);
+        truckMarkerRef.current = null;
       }
     }
-  }, [currentLocation, isDraggable, onTruckDrag]);
+  }, [currentLocation, mapRef]);
 
   // Fonction pour calculer la distance entre deux points
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -142,35 +92,45 @@ const MapComponent = ({
   }
 
   return (
-    <MapContainer center={mapCenter} zoom={13} style={{ height: "100%", width: "100%" }}>
+    <MapContainer
+      center={mapCenter}
+      zoom={13}
+      style={{ height: '100%', width: '100%' }}
+      zoomControl={false}
+      ref={ref}
+      whenCreated={(map) => {
+        if (ref) {
+          if (typeof ref === 'function') {
+            ref(map);
+          } else if (ref.hasOwnProperty('current')) {
+            ref.current = map;
+          }
+        }
+        if (internalMapRef) internalMapRef.current = map;
+      }}
+    >
       <MapEvents onMapClick={onMapClick} isPinMode={isPinMode} />
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
       <MapUpdater center={mapCenter} zoom={13} />
       <MapResizeHandler />
 
-      {currentLocation && (
-        <>
-          {/* Marqueur de position standard (masqué si la flèche directionnelle est active) */}
-          {heading === null && !isMonitoring && !isSimulation && (
-            <Marker position={currentLocation} icon={orangePinIcon}>
-              <Popup>Vous êtes ici</Popup>
-            </Marker>
-          )}
+      {currentLocation && !isMonitoring && !isSimulation && (
+        <Marker position={currentLocation} icon={bluePinIcon}>
+          <Popup>Votre position actuelle</Popup>
+        </Marker>
+      )}
 
-          {/* Camion directionnel */}
-          {(heading !== null || isMonitoring || isSimulation) && (
-            <DirectionMarker
-              position={currentLocation}
-              heading={heading}
-              routeGeometry={routeGeometry}
-              isMonitoring={isMonitoring}
-              isSimulation={isSimulation}
-            />
-          )}
-        </>
+      {currentLocation && (isMonitoring || isSimulation) && (
+        <DirectionMarker
+          position={currentLocation}
+          heading={heading}
+          routeGeometry={routeGeometry}
+          isMonitoring={isMonitoring}
+          isSimulation={isSimulation}
+        />
       )}
 
       {positionArrivee && (
@@ -179,27 +139,49 @@ const MapComponent = ({
         </Marker>
       )}
 
-      {/* Afficher le chemin restant avec de meilleures couleurs et animations */}
-      {routeGeometry &&
-        routeGeometry.length > 0 &&
-        ((isMonitoring || isSimulation) && remainingPath.length > 0 ? (
+      {/* Afficher le chemin avec animation de flèches */}
+      {routeGeometry && routeGeometry.length > 0 && (
+        <>
+          {/* Ligne de base du trajet */}
           <Polyline
-            positions={remainingPath}
-            color={safePathIndex === selectedRouteIndex ? "#8b5cf6" : "#3b82f6"} // Violet pour safe path, bleu pour normal
+            positions={isMonitoring || isSimulation ? remainingPath : routeGeometry}
+            color={"#4285F4"} // Bleu Google Maps
             weight={5}
-            opacity={0.8}
-            dashArray="10, 5"
-            className="remaining-path"
+            opacity={0.9}
+            className="animated-route"
           />
-        ) : (
-          <Polyline
-            positions={routeGeometry}
-            color={safePathIndex === selectedRouteIndex ? "#8b5cf6" : "#3b82f6"}
-            weight={5}
-            opacity={0.8}
-            className="remaining-path"
-          />
-        ))}
+          
+          {/* Animation des flèches le long du trajet */}
+          {Array.from({ length: 10 }).map((_, i) => {
+            // Calculer la position de chaque flèche le long du trajet
+            const path = isMonitoring || isSimulation ? remainingPath : routeGeometry;
+            const segmentLength = path.length / 10;
+            const startIdx = Math.floor(i * segmentLength);
+            const endIdx = Math.min(Math.ceil((i + 1) * segmentLength), path.length - 1);
+            
+            if (startIdx >= endIdx) return null;
+            
+            const arrowPath = path.slice(startIdx, endIdx + 1);
+            
+            return (
+              <Polyline
+                key={`arrow-${i}`}
+                positions={arrowPath}
+                color={"#4285F4"}
+                weight={5}
+                opacity={0}
+                dashArray="20, 30"
+                className="animated-arrow"
+                style={{
+                  animation: `dash 1s linear ${i * 0.5}s infinite`,
+                  strokeLinecap: 'round',
+                  strokeLinejoin: 'round',
+                }}
+              />
+            );
+          })}
+        </>
+      )}
 
       {showZones &&
         zones.map((zone, index) => {
@@ -227,9 +209,60 @@ const MapComponent = ({
           )
         })}
 
-      {isPinMode && <div className="pin-mode-indicator">Cliquez sur la carte pour placer votre destination</div>}
+      {isPinMode && (
+        <>
+          <div style={{ 
+            position: 'fixed', 
+            bottom: '70px',
+            left: '50%',
+            transform: 'translateX(calc(-50% + 20px))',
+            zIndex: 1000,
+            textAlign: 'center',
+            maxWidth: '90%',
+            padding: '10px 20px',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            color: 'white',
+            borderRadius: '25px',
+            boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
+            animation: 'pulse 2s infinite',
+            whiteSpace: 'nowrap'
+          }}>
+            Cliquez sur la carte pour placer votre destination
+          </div>
+          <div style={{
+            position: 'fixed',
+            bottom: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            textAlign: 'center'
+          }}>
+            <button 
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Désactive immédiatement le mode pin AVANT le click sur la carte
+                if (typeof window !== "undefined") {
+                  const event = new CustomEvent('cancelPinMode');
+                  window.dispatchEvent(event);
+                }
+              }}
+              className="cancel-pin-button"
+              style={{
+                width: 'auto',
+                minWidth: '120px',
+                padding: '10px 30px'
+              }}
+            >
+              Annuler
+            </button>
+          </div>
+        </>
+      )}
     </MapContainer>
   )
-}
+})
+
+MapComponent.displayName = 'MapComponent';
 
 export default MapComponent

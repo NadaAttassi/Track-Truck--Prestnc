@@ -39,12 +39,23 @@ function findMultipleRoutes(startNodeId, endNodeId, nodes, edges, wayNames, endL
     const durationInHours = totalDistanceKm / averageSpeedKmh
     const durationInMinutes = durationInHours * 60
 
+    // Calculer un score (exemple simple, à adapter selon logique métier)
+    const score = (1 - Math.min(1, Math.random())).toFixed(4)
+    // Statistiques de risque (exemple, à adapter)
+    const stats = { "élevé": 0, "moyen": 0, "faible": 0 }
+    // isSafe selon un seuil arbitraire sur riskLevel (à adapter)
+    const riskLevel = Math.random()
+    const isSafe = riskLevel < 0.5
+
     routes.push({
       geometry: geometry.map((coord) => [coord.lat, coord.lon]),
       instructions: generateInstructions(path, nodes, wayNames),
       distance: totalDistanceKm * 1000, // Convertir en mètres pour l'affichage
       duration: durationInMinutes,
-      riskLevel: Math.random(), // Simuler un niveau de risque
+      riskLevel,
+      score,
+      stats,
+      isSafe
     })
 
     console.log(

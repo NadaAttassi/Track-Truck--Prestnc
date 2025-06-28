@@ -29,31 +29,134 @@ export const getRiskCategory = (riskScore) => {
 
 /**
  * Détermine la classe CSS pour les boutons de route basée sur le risque
- * @param {number} index - Index de la route
- * @param {Array} riskAnalysis - Données d'analyse de risque
- * @param {number} safePathIndex - Index du Safe Path
+ * @param {number} riskScore - Score de risque entre 0 et 1
+ * @param {boolean} isSelected - Si la route est sélectionnée
+ * @param {boolean} isSafePath - Si c'est le Safe Path
  * @returns {string} - Classes CSS
  */
-export const getRouteButtonClass = (index, riskAnalysis, safePathIndex) => {
-  if (riskAnalysis.length <= index || !riskAnalysis[index]) {
-    return "low-risk"
+export const getRouteButtonClass = (riskScore, isSelected, isSafePath) => {
+  // Si c'est le Safe Path, on utilise la classe spéciale mauve
+  if (isSafePath) {
+    return isSelected ? 'route-button safe-path selected' : 'route-button safe-path';
   }
 
-  if (safePathIndex === index) {
-    return "safe-path"
+  // Vérifier que riskScore est un nombre valide
+  const score = typeof riskScore === 'number' ? riskScore : 0;
+  
+  // Déterminer la classe en fonction du score de risque
+  if (score >= 0.7) {
+    return isSelected ? 'route-button high-risk selected' : 'route-button high-risk';
+  } else if (score >= 0.4) {
+    return isSelected ? 'route-button medium-risk selected' : 'route-button medium-risk';
+  } else {
+    return isSelected ? 'route-button low-risk selected' : 'route-button low-risk';
   }
+};
 
-  const riskScore = riskAnalysis[index].averageRiskScore || 0
-  const category = getRiskCategory(riskScore)
+// Fonction pour obtenir la couleur en fonction du score de risque
+export const getRiskColor = (riskScore) => {
+  const score = typeof riskScore === 'number' ? riskScore : 0;
+  if (score >= 0.7) return '#dc3545'; // Rouge
+  if (score >= 0.4) return '#ffc107'; // Jaune
+  return '#28a745'; // Vert
+};
 
-  console.log(`Itinéraire ${index + 1} - Score de risque: ${riskScore.toFixed(4)} (${category})`)
+// Fonction pour obtenir la couleur de fond en fonction du score de risque
+export const getRiskBackgroundColor = (riskScore, opacity = 1) => {
+  const score = typeof riskScore === 'number' ? riskScore : 0;
+  if (score >= 0.7) return `rgba(220, 53, 69, ${opacity})`; // Rouge
+  if (score >= 0.4) return `rgba(255, 193, 7, ${opacity})`; // Jaune
+  return `rgba(40, 167, 69, ${opacity})`; // Vert
+};
 
-  switch (category) {
-    case "élevé": return "high-risk"
-    case "moyen": return "medium-risk"
-    default: return "low-risk"
+// Fonction pour obtenir le libellé de risque
+export const getRiskLabel = (riskScore) => {
+  const score = typeof riskScore === 'number' ? riskScore : 0;
+  if (score >= 0.7) return 'Élevé';
+  if (score >= 0.4) return 'Moyen';
+  return 'Faible';
+};
+
+// Fonction pour obtenir l'icône de risque
+export const getRiskIcon = (riskScore) => {
+  const score = typeof riskScore === 'number' ? riskScore : 0;
+  if (score >= 0.7) return '🔴';
+  if (score >= 0.4) return '🟡';
+  return '🟢';
+};
+
+// Fonction pour formater le score de risque en pourcentage
+export const formatRiskScore = (riskScore) => {
+  const score = typeof riskScore === 'number' ? riskScore : 0;
+  return Math.round(score * 100) + '%';
+};
+
+// Fonction pour obtenir la description du niveau de risque
+export const getRiskDescription = (riskScore) => {
+  const score = typeof riskScore === 'number' ? riskScore : 0;
+  
+  if (score >= 0.7) {
+    return 'Risque élevé - Soyez extrêmement prudent et envisagez un itinéraire alternatif.';
   }
-}
+  if (score >= 0.4) {
+    return 'Risque modéré - Restez vigilant et respectez les règles de sécurité.';
+  }
+  return 'Risque faible - Itinéraire relativement sûr.';
+};
+
+// Fonction pour normaliser les données de risque
+export const normalizeRiskData = (riskData) => {
+  if (!riskData) {
+    return {
+      averageRiskScore: 0,
+      riskStats: {
+        élevé: 0,
+        moyen: 0,
+        faible: 0
+      },
+      detectedZones: [],
+      detectedRisks: []
+    };
+  }
+  
+  // Si c'est un tableau, retourner le premier élément normalisé
+  if (Array.isArray(riskData) && riskData.length > 0) {
+    return normalizeRiskData(riskData[0]);
+  }
+  
+  // Retourner un objet normalisé
+  return {
+    // Utiliser averageRiskScore avec fallback sur riskScore
+    averageRiskScore: typeof riskData.averageRiskScore === 'number' 
+      ? riskData.averageRiskScore 
+      : (typeof riskData.riskScore === 'number' ? riskData.riskScore : 0),
+      
+    // S'assurer que riskStats est défini et contient les bonnes propriétés
+    riskStats: {
+      élevé: riskData.riskStats?.['élevé'] || 0,
+      moyen: riskData.riskStats?.moyen || 0,
+      faible: riskData.riskStats?.faible || 0
+    },
+    
+    // S'assurer que les tableaux sont définis
+    detectedZones: Array.isArray(riskData.detectedZones) ? riskData.detectedZones : [],
+    detectedRisks: Array.isArray(riskData.detectedRisks) ? riskData.detectedRisks : []
+  };
+};
+
+// Fonction pour obtenir un résumé des statistiques de risque
+export const getRiskSummary = (riskData) => {
+  const normalized = normalizeRiskData(riskData);
+  
+  return {
+    score: normalized.averageRiskScore,
+    level: getRiskLabel(normalized.averageRiskScore),
+    icon: getRiskIcon(normalized.averageRiskScore),
+    color: getRiskColor(normalized.averageRiskScore),
+    stats: normalized.riskStats,
+    totalRisks: Object.values(normalized.riskStats).reduce((sum, count) => sum + count, 0)
+  };
+};
 
 /**
  * Détermine le niveau de risque global d'une route

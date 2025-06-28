@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-const useGeolocation = (setError) => {
+const useGeolocation = (setError, isSimulationMode = false) => {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const watchIdRef = useRef(null);
@@ -17,6 +17,7 @@ const useGeolocation = (setError) => {
   );
 
   const getCurrentLocation = useCallback(() => {
+    if (isSimulationMode) return; // Désactive la géoloc réelle en simulation
     console.log('Démarrage de la récupération de la position...');
     if (navigator.geolocation) {
       setIsLoadingLocation(true);
@@ -52,13 +53,23 @@ const useGeolocation = (setError) => {
       safeSetError('Géolocalisation non supportée par votre navigateur.');
       setIsLoadingLocation(false);
     }
-  }, [safeSetError]);
+  }, [safeSetError, isSimulationMode]);
 
   useEffect(() => {
-    getCurrentLocation();
-  }, [getCurrentLocation]);
+    if (!isSimulationMode) {
+      getCurrentLocation();
+    }
+  }, [getCurrentLocation, isSimulationMode]);
 
   useEffect(() => {
+    if (isSimulationMode) {
+      // Arrêter le suivi si on passe en simulation
+      if (watchIdRef.current) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      return;
+    }
     if (navigator.geolocation) {
       watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => {
@@ -77,9 +88,10 @@ const useGeolocation = (setError) => {
     return () => {
       if (watchIdRef.current) {
         navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
       }
     };
-  }, [safeSetError]);
+  }, [safeSetError, isSimulationMode]);
 
   return { currentLocation, setCurrentLocation, getCurrentLocation, isLoadingLocation };
 };

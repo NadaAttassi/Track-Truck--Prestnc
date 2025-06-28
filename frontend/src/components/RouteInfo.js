@@ -27,8 +27,16 @@ const RouteInfo = ({
     return null
   }
 
-  const getRouteButtonStyle = (index, riskData) => {
-    if (!riskData || typeof riskData.averageRiskScore !== 'number') {
+  const getRouteButtonStyle = (index) => {
+    const riskData = riskAnalysis && riskAnalysis[index] ? {
+      ...riskAnalysis[index],
+      averageRiskScore: typeof riskAnalysis[index].averageRiskScore === 'number'
+        ? riskAnalysis[index].averageRiskScore
+        : riskAnalysis[index].riskScore || 0,
+      riskStats: riskAnalysis[index].riskStats || { élevé: 0, moyen: 0, faible: 0 }
+    } : null;
+
+    if (!riskData) {
       console.log(`⚠️ Route ${index + 1}: Aucun score de risque disponible`)
       return {
         backgroundColor: "#6c757d",
@@ -37,44 +45,43 @@ const RouteInfo = ({
       }
     }
 
-    const riskScore = riskData.averageRiskScore
-    const riskStats = riskData.riskStats || {}
+    const riskScore = riskData.averageRiskScore;
+    const riskStats = riskData.riskStats;
 
     console.log(
-      `🔍 Route ${index + 1}: riskScore=${riskScore.toFixed(4)}, élevé=${riskStats["élevé"] || 0}, moyen=${riskStats["moyen"] || 0}, faible=${riskStats["faible"] || 0}, safePathIndex=${safePathIndex}, index=${index}`,
-    )
+      `🔍 Route ${index + 1}:`, {
+        score: riskScore.toFixed(4),
+        stats: riskStats,
+        isSafe: safePathIndex === index
+      }
+    );
 
-    // Vérifier si la route est "SAFE" uniquement si elle est safePathIndex
-    const isSafe = safePathIndex === index
-    console.log(`🛡️ Route ${index + 1}: isSafe=${isSafe} (safePathIndex === index: ${safePathIndex === index})`)
-
-    if (isSafe) {
+    if (safePathIndex === index) {
       return {
-        backgroundColor: "#6f42c1", // Couleur mauve pour la route "SAFE"
+        backgroundColor: "#6f42c1",
         color: "white",
         border: "2px solid #6f42c1",
-      }
+      };
     }
 
-    // Utiliser le score de risque numérique pour déterminer la couleur
     if (riskScore >= 0.7) {
       return {
-        backgroundColor: "#dc3545", // Rouge pour risque élevé
+        backgroundColor: "#dc3545",
         color: "white",
         border: "2px solid #dc3545",
-      }
+      };
     } else if (riskScore >= 0.5) {
       return {
-        backgroundColor: "#ffc107", // Jaune pour risque moyen
+        backgroundColor: "#ffc107",
         color: "black",
         border: "2px solid #ffc107",
-      }
+      };
     } else {
       return {
-        backgroundColor: "#28a745", // Vert pour risque faible
+        backgroundColor: "#28a745",
         color: "white",
         border: "2px solid #28a745",
-      }
+      };
     }
   }
 
@@ -89,16 +96,27 @@ const RouteInfo = ({
     setShowInstructions(false)
   }
 
-  const currentRiskData =
-    riskAnalysis && riskAnalysis.length > 0 && riskAnalysis[selectedRouteIndex]
-      ? riskAnalysis[selectedRouteIndex]
-      : null
+  const currentRiskData = riskAnalysis && riskAnalysis[selectedRouteIndex] ? {
+    ...riskAnalysis[selectedRouteIndex],
+    averageRiskScore: typeof riskAnalysis[selectedRouteIndex].averageRiskScore === 'number'
+      ? riskAnalysis[selectedRouteIndex].averageRiskScore
+      : riskAnalysis[selectedRouteIndex].riskScore || 0,
+    riskStats: riskAnalysis[selectedRouteIndex].riskStats || { élevé: 0, moyen: 0, faible: 0 }
+  } : null;
 
-  console.log(`📊 Données actuelles: selectedRouteIndex=${selectedRouteIndex}, safePathIndex=${safePathIndex}, currentRiskData=${JSON.stringify(currentRiskData)}`)
+  console.log(`📊 Données actuelles:`, {
+    selectedRouteIndex,
+    safePathIndex,
+    currentRiskData: currentRiskData ? {
+      score: currentRiskData.averageRiskScore,
+      stats: currentRiskData.riskStats,
+      zones: currentRiskData.detectedZones?.length || 0
+    } : "null"
+  });
 
-  const isExpanded = expandedCard === "route"
+  const isExpanded = expandedCard === "route";
 
-  const currentInstructions = routes[selectedRouteIndex]?.instructions || routeInstructions || []
+  const currentInstructions = routes[selectedRouteIndex]?.instructions || routeInstructions || [];
 
   return (
     <div

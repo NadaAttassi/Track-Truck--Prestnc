@@ -3,28 +3,62 @@ const router = express.Router();
 const pool = require('../db');
 const fetchFromGeocoder = require('../utils/fetchFromGeocoder');
 
+// Mapping des catégories vers les types
+const categoryToTypes = {
+  transport: ['aerodrome', 'airport', 'bus_station', 'bus_stop', 'train_station', 'tram_stop', 'parking', 'fuel', 'gas_station'],
+  accommodation: ['hotel', 'tourism_guest_house', 'hostel', 'apartment'],
+  food: ['restaurant', 'cafe', 'fast_food', 'bar', 'pub'],
+  health: ['hospital', 'clinic', 'doctor', 'dentist', 'pharmacy'],
+  shopping: ['shop', 'supermarket', 'mall', 'bakery', 'clothing', 'electronics_store'],
+  tourism: ['tourist_attraction', 'museum', 'park', 'beach', 'castle'],
+  education: ['school', 'university', 'library', 'language_school'],
+  services: ['bank', 'post_office', 'police_station', 'pharmacy']
+};
+
 router.post('/', async (req, res) => {
-  let { query } = req.body;
-  if (!query) {
-    console.log('Requête /api/suggestions: query vide');
-    return res.json([]);
+  console.log('Requête reçue sur /api/suggestions:', req.body);
+  
+  let { query, category } = req.body;
+  if (!query || typeof query !== 'string') {
+    console.log('Requête /api/suggestions: query manquante ou invalide');
+    return res.status(400).json({ error: 'Le paramètre query est requis et doit être une chaîne de caractères' });
   }
 
-  query = query.replace(/^"|"$/g, '');
+  query = query.trim().replace(/^"|"$/g, '');
+  
+  if (category && typeof category !== 'string') {
+    console.log('Catégorie invalide:', category);
+    return res.status(400).json({ error: 'Le paramètre category doit être une chaîne de caractères' });
+  }
 
   try {
     console.log('Requête /api/suggestions:', query);
 
     // Step 1: Fetch suggestions from the database
-    const sqlQuery = `
+    let sqlQuery = `
       SELECT name, type, city, lat, lon 
       FROM places 
-      WHERE name ILIKE $1 
-        OR type ILIKE $1 
-        OR city ILIKE $1 
-      LIMIT 10
+      WHERE (name ILIKE $1 OR type ILIKE $1 OR city ILIKE $1)
     `;
-    const values = [`%${query}%`];
+    
+    let values = [`%${query}%`];
+    
+    // Si une catégorie est spécifiée et valide, filtrer par types de cette catégorie
+    if (category && categoryToTypes[category]) {
+      const types = categoryToTypes[category];
+      if (types && types.length > 0) {
+        const placeholders = types.map((_, i) => `$${values.length + i + 1}`).join(',');
+        sqlQuery += ` AND type IN (${placeholders})`;
+        values = values.concat(types);
+        console.log(`Filtrage des types pour la catégorie ${category}:`, types);
+        console.log(`Requête SQL:`, sqlQuery);
+        console.log(`Valeurs:`, values);
+      } else {
+        console.log(`Aucun type défini pour la catégorie: ${category}`);
+      }
+    }
+    
+    sqlQuery += ' LIMIT 15';
     const dbResult = await pool.query(sqlQuery, values);
 
     let suggestions = dbResult.rows.map(row => ({

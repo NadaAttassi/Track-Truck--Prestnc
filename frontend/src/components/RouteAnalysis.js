@@ -36,9 +36,33 @@ const RouteAnalysis = ({
   }, [route, riskData])
 
   const analyzeRoute = (routeToAnalyze, riskDataToAnalyze) => {
-    const geometry = routeToAnalyze.geometry || []
-    const riskScore = riskDataToAnalyze.averageRiskScore || 0
-    const riskStats = riskDataToAnalyze.riskStats || {}
+    if (!routeToAnalyze || !riskDataToAnalyze) {
+      console.warn("Données manquantes pour l'analyse de la route");
+      return {
+        riskLevel: "inconnu",
+        riskScore: 0,
+        highRiskZones: 0,
+        mediumRiskZones: 0,
+        lowRiskZones: 0,
+        totalRiskPoints: 0,
+        riskPercentage: 0,
+        riskLabel: "Données indisponibles"
+      };
+    }
+    
+    const geometry = routeToAnalyze.geometry || [];
+    
+    // Utiliser averageRiskScore avec fallback sur riskScore pour la compatibilité
+    const riskScore = riskDataToAnalyze.averageRiskScore !== undefined 
+      ? riskDataToAnalyze.averageRiskScore 
+      : riskDataToAnalyze.riskScore || 0;
+      
+    // S'assurer que riskStats est défini
+    const riskStats = riskDataToAnalyze.riskStats || {
+      élevé: 0,
+      moyen: 0,
+      faible: 0
+    };
 
     // 1. Analyse des zones à risque basée sur le score numérique
     const highRiskZones = riskStats["élevé"] || 0

@@ -131,12 +131,21 @@ router.post("/analyze-risk", async (req, res) => {
 
     // Pré-calculer les centres de gravité
     const zonesWithCentroids = zones.map((zone, zoneIndex) => {
+      const zoneId = zone.zoneId || zone.id || `zone_${zoneIndex}`
       const centroid = calculateCentroid(zone.geometry)
       const riskCategory = getRiskCategory(zone.risk_numeric)
+      
       console.log(
-        `📍 Zone ${zone.zoneId || zoneIndex}: ${zone.risk_numeric.toFixed(4)} (${riskCategory}) - Centroïde: ${centroid ? `${centroid.lat.toFixed(4)}, ${centroid.lon.toFixed(4)}` : "non calculé"}`,
+        `📍 Zone ${zoneId}: ${zone.risk_numeric.toFixed(4)} (${riskCategory}) - Centroïde: ${centroid ? `${centroid.lat.toFixed(4)}, ${centroid.lon.toFixed(4)}` : "non calculé"}`,
       )
+      
+      // Vérifier que la géométrie est valide
+      if (!zone.geometry || !Array.isArray(zone.geometry) || zone.geometry.length < 3) {
+        console.warn(`⚠️ Zone ${zoneId} - Géométrie invalide ou trop courte`)
+      }
+
       return {
+        id: zoneId, // Garantir que chaque zone a un identifiant unique
         ...zone,
         centroid: centroid,
         riskCategory: riskCategory
@@ -159,7 +168,6 @@ router.post("/analyze-risk", async (req, res) => {
           totalPoints: 0,
         }
       }
-
       console.log(`\n🛣️ ANALYSE ITINÉRAIRE ${routeIndex + 1}`)
       console.log(`📍 ${geometry.length} points à analyser`)
 
@@ -264,7 +272,7 @@ router.post("/analyze-risk", async (req, res) => {
 
       // Calculer le score de risque moyen pour cet itinéraire
       const averageRiskScore = riskScores.length > 0 
-        ? riskScores.reduce((sum, score) => sum + score, 0) / riskScores.length 
+        ? riskScores.reduce((sum, score) => sum + score, 0) / riskScores.length
         : 0
 
       // Calculer les statistiques par catégorie
@@ -279,6 +287,7 @@ router.post("/analyze-risk", async (req, res) => {
       console.log(`   🔴 Élevé: ${riskStats["élevé"]} zones`)
       console.log(`   🟡 Moyen: ${riskStats["moyen"]} zones`)
       console.log(`   🟢 Faible: ${riskStats["faible"]} zones`)
+      console.log(`   📊 Nombre de scores: ${riskScores.length}`)
       console.log(`   📍 Total zones détectées: ${detectedZoneIds.size}`)
       console.log(`   🎯 Points analysés: ${sampledGeometry.length}`)
 
@@ -294,10 +303,12 @@ router.post("/analyze-risk", async (req, res) => {
       return {
         routeIndex: routeIndex,
         averageRiskScore,
+        riskScore: averageRiskScore, // Pour compatibilité ascendante
         riskStats,
         totalPoints: sampledGeometry.length,
         detectedZones: Array.from(detectedZoneIds),
         detectedRisks: detectedRisks,
+        riskScores: riskScores // Ajout des scores bruts pour débogage
       }
     })
 
@@ -311,21 +322,21 @@ router.post("/analyze-risk", async (req, res) => {
       const averageRiskScore = analysis.averageRiskScore
       
       console.log(`🔍 Itinéraire ${idx + 1}:`)
-      console.log(`   📈 Score de risque: ${averageRiskScore.toFixed(4)}`)
+      console.log(`   📈 Score de risque moyen: ${averageRiskScore.toFixed(4)}`)
       console.log(`   🔴 Élevé: ${analysis.riskStats["élevé"]}`)
       console.log(`   🟡 Moyen: ${analysis.riskStats["moyen"]}`)
       console.log(`   🟢 Faible: ${analysis.riskStats["faible"]}`)
 
-      // On ne prend en compte que le score de risque pour déterminer le Safe Path
+      // On prend en compte la moyenne des scores de risque pour déterminer le Safe Path
       if (averageRiskScore < lowestRiskScore) {
         lowestRiskScore = averageRiskScore
         bestRouteIndex = idx
-        console.log(`   🏆 NOUVEAU MEILLEUR: Itinéraire ${idx + 1} avec score de risque ${averageRiskScore.toFixed(4)}`)
+        console.log(`   🏆 NOUVEAU MEILLEUR: Itinéraire ${idx + 1} avec score de risque moyen ${averageRiskScore.toFixed(4)}`)
       }
 
       return {
         ...analysis,
-        riskScore: averageRiskScore,
+        riskScore: averageRiskScore, // On utilise la moyenne comme score de risque global
       }
     })
 
